@@ -1,0 +1,318 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# IE - Master in Business Analytics and Big Data
+Data Visulization
+
+Prof: Jaime De Mora Navarro 
+
+Group H: Amal AlMutawa | Alan Carton | Ryan Chiu | Manuel Ehmann | Sabrina Mirtcheva | Harpeet Singh Perhar | Andrea Savlati
+
+
+# Initialization
+
+Import libraries
+
+```{r}
+# Load libaries for graphs & plots
+library(ggplot2)
+library(dbplyr)
+library(data.table)
+library(tidyverse)
+library(scales)
+library(ggpubr)
+```
+
+Load the data
+
+```{r} 
+#change path to match yours
+transactions = read.csv("//Users/amal/Desktop/Group\ H\ DV\ /madrid_transactions.csv", header=T, na.strings=c("","NA"))
+
+```
+
+Explore the dataset.
+
+```{r}
+summary(transactions)
+str(transactions)
+```
+
+## Produce Graphs
+
+# slide 3: What is the most active category - in terms of transactions? 
+NOTE: change value of heat_map to produce different graphs & change title value
+
+```{r }
+# Create filter for transaction amount
+# Value to change is here
+heat_map <- dplyr::filter(transactions, amount < 51)
+
+# Create heatmap, defining range
+longdf = heat_map %>%
+     group_by(category) %>%
+     complete(hour = 1:23 )
+
+# Create plot, add axis labels and range, define font colors and aesthetics 
+# Change title for amount of filter
+active_cat_plot <- ggplot(longdf , aes(hour, category, fill = amount)) +
+  geom_tile() + labs(title ="Spending Throughout the Day for Transactions < EUR 50", 
+                     x = "Hour of the Day", y = "Category") +
+  scale_fill_continuous(name = "Amount Spent") +
+  scale_y_discrete(expand=c(0,0)) + scale_x_discrete(limits = c(1:23), expand=c(0,0)) + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(family="Gill Sans Light", face="bold", color="gray28", size=8), 
+        axis.text.y = element_text(family="Gill Sans Light", face="bold", color="gray28", size=8)) +
+  theme(plot.title = element_text(family="Gill Sans Light", color="gray28", size=14, face="bold"),
+        axis.title.x = element_text(family="Gill Sans Light", color="gray28", size=10, face="bold"),
+        axis.title.y = element_text(family="Gill Sans Light", color="gray28", size=10, face="bold")) +
+    scale_fill_continuous(na.value = "grey77", high = "#132B43", low = "#56B1F7") 
+
+active_cat_plot
+
+```
+
+# Slide 4: Is there a particular time in which tourists are buying?
+
+```{r }
+
+# Add a column indicating which category should be highlighted in red
+transactions <- transactions %>% mutate(ToHighlight = ifelse(hour == 17, "yes", "no" ) )
+
+# Create plot, add title, axes labels, assign histogram color, define x-axis scale
+My_plot <- ggplot(transactions,aes(x=hour, y=amount, fill = ToHighlight )) +
+  geom_bar(stat="sum", na.rm=TRUE) + ggtitle("Amount Spent Per Hour") + 
+  xlab("Hours of the day") + ylab("Total Amount Spent in EUR") + 
+  scale_fill_manual(values = c( "yes"="red", "no"="steelblue" ), guide = FALSE ) + 
+  scale_y_continuous(label=comma, expand = c(0,0),limits = c(0,80000)) + 
+  scale_x_continuous(breaks=seq(0,24,2)) + 
+  theme(panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+# Add Title, Axis Labels & Colors, remove legend
+My_plot <- My_plot + theme(plot.title = element_text(family="Gill Sans Light", 
+                                                     color="gray28", size=16, face="bold"),
+                           axis.title.x = element_text(family="Gill Sans Light", 
+                                                       color="gray28", size=10, face="bold"),
+                           axis.title.y = element_text(family="Gill Sans Light", 
+                                                       color="gray28", size=10, face="bold")) +
+  theme(plot.title = element_text(hjust = 0.5)) + theme(legend.position="none")
+
+My_plot
+
+```
+
+# Slide 5:  What is the most active category - in terms of transactions? 
+
+```{r }
+
+# Create data table, and find count of number of transactions
+category_n <- as.data.table(transactions)
+category_n <- category_n[, .(count= .N, var = sum(amount)), by ="category" ]
+category_n <- category_n[order(count, decreasing = TRUE)]
+
+# Filter top 7 categories
+category_top7 <- category_n[0:7]
+  
+# Create plot
+top7_plot <- ggplot(category_top7, aes(x = category, y = count))
+
+# Create scatterplot, add title and y-axis label
+top7_plot <- top7_plot + geom_jitter(aes(col=category, size=count)) +
+    ggtitle("Top 7 Categories by Number of Transactions") + ylab("Number of Transactions") + 
+  theme(panel.background = element_blank(), axis.line = element_line(colour = "black"))
+  
+# Set scale range, remove x-axis, set y-scale range, add commas to y-axis, define title aestetics
+top7_plot <- top7_plot + scale_size(range=c(12,30), breaks=c(45,60)) +
+  theme(axis.title.x=element_blank(), 
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+     scale_y_continuous(limits = c(0,6500), label=comma) +
+     theme(plot.title = element_text(family="Gill Sans Light", 
+                                                     color="gray28", size=16, face="bold", hjust=2),
+           axis.title.y = element_text(family="Gill Sans Light", 
+                                       color="gray28", size=10, face="bold")) 
+
+top7_plot
+
+```
+
+# Slide 6: Is there any relationship between day of the week and consumption?
+
+```{r}
+
+# Create data table, and find mean
+day_mean <- as.data.table(transactions)
+day_mean <- day_mean[, mean(amount), by ="weekday" ]
+
+# Create plot, and add title
+Thurs_Fri_plot <- ggplot(day_mean, aes(x=reorder(weekday, desc(weekday)), y=V1)) +
+  geom_bar(stat="identity", aes(fill = weekday)) + 
+  ggtitle("Spending on Thursday vs Friday") + 
+  scale_fill_manual(values = c("slategray3", "coral1")) + 
+  theme(panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+# Change labels, color of axes; remove x-axis, add white text on top of bars
+Thurs_Fri_plot <- Thurs_Fri_plot + 
+  ylab("Average Total Spending") + 
+  theme(plot.title = element_text(family="Gill Sans Light", color="gray28", size=16, face="bold"),
+        axis.title.x = element_text(color="gray28", size=10, face="bold"),
+        axis.title.y = element_text(family="Gill Sans Light", color="gray28", size=12, face="bold")) +
+  theme(plot.title = element_text(hjust = 0.5)) + theme(legend.position="none") + 
+  theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
+  geom_text(label=c("Thursday", "Friday"), vjust=9, 
+            color = "white", position = position_dodge(1), size=8,
+            aes(y = V1, label = V1)) + 
+   scale_y_continuous(expand = c(0,0), limits = c(0,120))
+
+#geom_text(aes(y = Value + 2 * sign(Value), label = Value), 
+  #            position = position_dodge(width = 0.9), 
+  #            size = 3.5 , angle = 90)
+
+Thurs_Fri_plot
+```
+
+# Slide 6: Is there any relationship between day of the week and consumption - by category? 
+
+```{r }
+
+# Create data table, and find mean of all transactions
+day_spending <- as.data.table(transactions)
+day_spending <- day_spending[, mean(amount), by = c("weekday", "category")]
+
+# Reorder y-lab
+transactions$category <- factor(transactions$category, levels = rev(levels(transactions$category)))
+levels(transactions$category)
+
+# Reorder legend
+transactions$weekday <- factor(transactions$weekday, levels = rev(levels(transactions$weekday)))
+levels(transactions$weekday)
+
+# Plot the graph, flip axis
+THF_plot <- ggplot(day_spending, aes(x = category, y = V1, fill = weekday, label=weekday)) + 
+  geom_histogram(stat = "identity", aes(col=weekday),  
+                 position = position_dodge(width = 0.6), 
+                 width=0.5, size=0) +
+  xlab("Category") + ylab("Average Spending") + 
+  scale_y_continuous(label=comma, expand = c(0,0), limits = c(0,500)) +
+  coord_flip() + ggtitle("Spending on Thursday vs Friday, by Category") + 
+  theme(panel.background = element_blank(), axis.line = element_line(colour = "black"))
+  
+# Change labels, color of axes and title, add legend spacing
+THF_plot <- THF_plot + scale_fill_manual(values=c("coral1", "slategray3"), 
+                                         labels = c("Thursday", "Friday"))+
+  theme(legend.title = element_blank()) + 
+  theme(plot.title = element_text(family="Gill Sans Light", 
+                                  color="gray28", size=14, face="bold"),
+         axis.title.x = element_text(family="Gill Sans Light", 
+                                     color="gray28", size=10, face="bold"),
+         axis.title.y = element_text(family="Gill Sans Light", 
+                                     color="gray28", size=10, face="bold")) + 
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(axis.text.x=element_text(angle=0, hjust=1), legend.spacing.x = unit(0.2, 'cm')) + 
+  scale_colour_discrete(guide=FALSE)
+
+THF_plot
+```
+
+# Slide 7: Which nationality has the highest average ticket?
+
+```{r }
+
+# Create data table, and find mean of number of transactions, show top 20
+countries_mean <- as.data.table(transactions)
+countries_mean <- countries_mean[, mean(amount), by ="customer_country" ]
+countries_mean <- countries_mean[order(V1, decreasing = TRUE)]
+top_20_countries <- countries_mean[0:20]
+
+# Create plot, define axes labels, define color of geom_point
+top_nationality_plot <- ggplot(top_20_countries, aes(x = reorder(customer_country, -V1), y = V1)) +
+  geom_point(size = 3, color = "dodgerblue3") + 
+  xlab("Country") + ylab("Average Spending (EUR)") + theme_classic() +
+  geom_segment(aes(x=customer_country,xend= customer_country, y=0, yend = V1)) + 
+  ggtitle("Top 20 Countries With Highest Spending") + 
+  scale_y_continuous(label=comma, expand = c(0,0),limits = c(0,550)) +  
+  theme(plot.title = element_text(family="Gill Sans Light", 
+                                                        color="gray28", size=16, face="bold"),
+                              axis.title.x = element_text(family="Gill Sans Light",
+                                                          color="gray28", size=10, face="bold"),
+                              axis.title.y = element_text(family="Gill Sans Light", 
+                                                          color="gray28", size=10, face="bold")) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+top_nationality_plot 
+
+```
+
+# Slide 8: How much are EU countries spending in total?  
+
+```{r }
+
+# Create list of EU countries
+EU_codes <- c("AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "SE")
+
+# Create dataframe with all the EU countries
+EU_countries <- transactions
+EU_countries <- dplyr::filter(EU_countries, customer_country == EU_codes)
+
+# Create datatable, and calculate the mean of each EU country
+EU_countries_mean <- as.data.table(EU_countries)
+EU_countries_mean <- EU_countries_mean[, mean(amount), by ="customer_country" ]
+EU_mean <- mean(EU_countries$amount)
+  
+# Create a new column for above/below average
+EU_countries_mean$c_type <- ifelse(EU_countries_mean$V1 < EU_mean, "below", "above") 
+
+# Create plot, change aesthetics of axes and title, center title, define legend name
+ggplot(EU_countries_mean, aes(x= reorder(customer_country, V1), y=V1, label=customer_country)) + 
+  geom_bar(stat='identity', aes(fill=c_type), width=.5)  + 
+  xlab("Country") + ylab("Average Spending (EUR)") + 
+  scale_fill_manual(name="EU Spending", 
+                    labels = c("Above Average", "Below Average"), 
+                    values = c("above"="#00ba38", "below"="#f8766d")) + 
+  labs(title= "European Countries - Average Spending Habits") +
+  coord_flip() + theme_classic() + scale_y_continuous(expand=c(0,0), label=comma) + 
+  theme(plot.title = element_text(family="Gill Sans Light", 
+                                  color="gray28", size=14, face="bold", hjust = 0.5),
+  axis.title.x = element_text(family="Gill Sans Light", 
+                              color="gray28", size=10, face="bold"),
+  axis.title.y = element_text(family="Gill Sans Light", 
+                              color="gray28", size=10, face="bold"))
+
+```
+  
+# Slide 8: How much are EU countries spending on fashion?  
+
+```{r }
+
+# Create new dateframe filtered by EU countries for only Fashion
+EU_countries_Fashion <- transactions
+EU_countries_Fashion <- dplyr::filter(EU_countries_Fashion, category == "Fashion & Shoes")
+EU_countries_Fashion <- dplyr::filter(EU_countries_Fashion, customer_country == EU_codes)
+
+# Calculate the mean of each EU country spending in fashion
+EU_countries_mean <- as.data.table(EU_countries_Fashion)
+EU_countries_mean <- EU_countries_mean[, sum(amount), by ="customer_country" ]
+
+# Fashion Mean of EU countries
+EU_mean <- mean(EU_countries_Fashion$amount)
+  
+# Create a new column for above/below average
+EU_countries_mean$c_type <- ifelse(EU_countries_mean$V1 < EU_mean, "below", "above") 
+
+# Create plot, change aesthetics of axes and title, center title, define legend name
+ggplot(EU_countries_mean, aes(x= reorder(customer_country, V1), y=V1, label=customer_country)) + 
+  geom_bar(stat='identity', aes(fill=c_type), width=.5)  + xlab("Country") + ylab("Average Spending (EUR)") + 
+  scale_fill_manual(name="EU Spending", 
+                    labels = c("Above Average", "Below Average"), 
+                    values = c("above"="#00ba38", "below"="#f8766d")) + 
+  labs(title= "European Countries - Spening on Fashion") +  coord_flip() + theme_classic() +
+  scale_y_continuous(expand=c(0,0), label=comma) +
+  theme(plot.title = element_text(family="Gill Sans Light", 
+                                  color="gray28", size=14, face="bold", hjust = 0.5),
+  axis.title.x = element_text(family="Gill Sans Light", 
+                              color="gray28", size=10, face="bold"),
+  axis.title.y = element_text(family="Gill Sans Light", 
+                              color="gray28", size=10, face="bold"))
+```   
